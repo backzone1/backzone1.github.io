@@ -1,8 +1,3 @@
-/**
- * 7K Tools - Main App
- */
-
-// ==================== ROUTER ====================
 const routes = {
     home: () => renderHome(),
     memory: () => renderMemorySolver(),
@@ -15,8 +10,6 @@ function navigate(page) {
     currentPage = page;
     render();
 }
-
-// ==================== COMPONENTS ====================
 
 function Sidebar() {
     const menuItems = [
@@ -143,8 +136,6 @@ function renderSettings() {
     `;
 }
 
-// ==================== MAIN RENDER ====================
-
 function render() {
     const app = document.getElementById('app');
     const content = routes[currentPage] ? routes[currentPage]() : renderHome();
@@ -157,11 +148,17 @@ function render() {
     `;
 }
 
-// ==================== MEMORY SOLVER LOGIC ====================
-
 let mediaRecorder = null;
 let recordedChunks = [];
 let stream = null;
+let compositeImage = null;
+
+const PROCESSING_CONFIG = {
+    fps: 10,
+    scaleDown: 0.5,
+    threshold: 30,
+    progressUpdateInterval: 5
+};
 
 async function startRecording() {
     try {
@@ -209,37 +206,128 @@ async function processRecording() {
     const blob = new Blob(recordedChunks, { type: 'video/webm' });
     document.getElementById('status').textContent = '🔍 กำลังวิเคราะห์ไพ่...';
     
-    // TODO: Implement frame extraction and card matching
-    // For now, show placeholder result
-    setTimeout(() => {
-        showPlaceholderResult();
-    }, 1000);
+    try {
+        await analyzeVideo(blob);
+        showResults();
+    } catch (err) {
+        console.error('Analysis error:', err);
+        document.getElementById('status').textContent = '❌ เกิดข้อผิดพลาด: ' + err.message;
+    }
 }
 
-function showPlaceholderResult() {
+async function analyzeVideo(blob) {
+    const video = document.createElement("video");
+    video.src = URL.createObjectURL(blob);
+
+    await new Promise((resolve) => {
+        video.onloadedmetadata = () => {
+            video.currentTime = 0;
+            resolve();
+        };
+    });
+
+    await new Promise((resolve) => {
+        video.onseeked = resolve;
+    });
+
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext("2d");
+
+    canvas.width = Math.floor(video.videoWidth * PROCESSING_CONFIG.scaleDown);
+    canvas.height = Math.floor(video.videoHeight * PROCESSING_CONFIG.scaleDown);
+
+    let duration = video.duration;
+    if (!isFinite(duration)) {
+        video.currentTime = 1e10;
+        await new Promise(r => video.onseeked = r);
+        duration = video.currentTime;
+        video.currentTime = 0;
+        await new Promise(r => video.onseeked = r);
+    }
+
+    const fps = PROCESSING_CONFIG.fps;
+    const frameCount = Math.floor(duration * fps);
+
+    video.currentTime = duration - 0.1;
+    await new Promise((resolve) => {
+        video.onseeked = resolve;
+    });
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const baselineData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+    const result = ctx.createImageData(canvas.width, canvas.height);
+    for (let i = 0; i < baselineData.data.length; i++) {
+        result.data[i] = baselineData.data[i];
+    }
+
+    const maxBrightness = new Float32Array(canvas.width * canvas.height);
+    for (let pixelIndex = 0; pixelIndex < canvas.width * canvas.height; pixelIndex++) {
+        const dataIndex = pixelIndex * 4;
+        const baseBrightness = (baselineData.data[dataIndex] + baselineData.data[dataIndex + 1] + baselineData.data[dataIndex + 2]) / 3;
+        maxBrightness[pixelIndex] = baseBrightness;
+    }
+
+    const threshold = PROCESSING_CONFIG.threshold;
+
+    for (let i = 0; i < frameCount; i++) {
+        video.currentTime = i / fps;
+        await new Promise((resolve) => {
+            video.onseeked = resolve;
+        });
+
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const currentData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+        for (let pixelIndex = 0; pixelIndex < canvas.width * canvas.height; pixelIndex++) {
+            const dataIndex = pixelIndex * 4;
+
+            const rDiff = Math.abs(currentData.data[dataIndex] - baselineData.data[dataIndex]);
+            const gDiff = Math.abs(currentData.data[dataIndex + 1] - baselineData.data[dataIndex + 1]);
+            const bDiff = Math.abs(currentData.data[dataIndex + 2] - baselineData.data[dataIndex + 2]);
+
+            const totalDiff = (rDiff + gDiff + bDiff) / 3;
+
+            if (totalDiff > threshold) {
+                const brightness = (currentData.data[dataIndex] + currentData.data[dataIndex + 1] + currentData.data[dataIndex + 2]) / 3;
+
+                if (brightness > maxBrightness[pixelIndex]) {
+                    maxBrightness[pixelIndex] = brightness;
+                    result.data[dataIndex] = currentData.data[dataIndex];
+                    result.data[dataIndex + 1] = currentData.data[dataIndex + 1];
+                    result.data[dataIndex + 2] = currentData.data[dataIndex + 2];
+                    result.data[dataIndex + 3] = 255;
+                }
+            }
+        }
+
+        if (i % PROCESSING_CONFIG.progressUpdateInterval === 0 || i === frameCount - 1) {
+            const progress = Math.round((i / frameCount) * 100);
+            document.getElementById('status').textContent = `🔍 วิเคราะห์... ${progress}% (${i}/${frameCount} frames)`;
+        }
+    }
+
+    ctx.putImageData(result, 0, 0);
+    compositeImage = canvas.toDataURL("image/png");
+    
+    URL.revokeObjectURL(video.src);
+}
+
+function showResults() {
     document.getElementById('resultSection').style.display = 'block';
     document.getElementById('status').textContent = '✅ เสร็จสิ้น!';
     document.getElementById('status').classList.add('text-green-400');
     
     const grid = document.getElementById('gridContainer');
-    const colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', 
-                    '#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c',
-                    '#e67e22', '#16a085', '#8e44ad', '#2980b9', '#c0392b', '#27ae60',
-                    '#e67e22', '#16a085', '#8e44ad', '#2980b9', '#c0392b', '#27ae60'];
+    const pairsList = document.getElementById('pairsList');
     
-    grid.innerHTML = '';
-    for (let i = 0; i < 24; i++) {
-        const row = String.fromCharCode(65 + Math.floor(i / 6));
-        const col = (i % 6) + 1;
-        grid.innerHTML += `
-            <div class="grid-card text-white text-xs" style="background: ${colors[i]}">
-                ${row}${col}
-            </div>
-        `;
-    }
+    grid.innerHTML = `
+        <img src="${compositeImage}" class="w-full rounded-lg border border-white/20" style="grid-column: span 8;">
+    `;
+    grid.style.gridTemplateColumns = '1fr';
     
-    document.getElementById('pairsList').innerHTML = `
-        <p class="text-gray-400 text-sm">⚠️ ฟีเจอร์วิเคราะห์ไพ่อัตโนมัติกำลังพัฒนา</p>
+    pairsList.innerHTML = `
+        <p class="text-green-400">✅ รูปด้านบนแสดงไพ่ทั้งหมดที่เปิดแล้ว</p>
+        <p class="text-gray-400 text-sm mt-2">ใช้รูปนี้เพื่อจำตำแหน่งคู่ไพ่</p>
     `;
 }
 
@@ -252,7 +340,7 @@ function resetMemory() {
     if (preview) preview.srcObject = null;
     
     recordedChunks = [];
+    compositeImage = null;
 }
 
-// ==================== INIT ====================
 render();
