@@ -1,0 +1,95 @@
+/* Custom styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+}
+
+/* Gold gradient text */
+.text-gradient {
+    background: linear-gradient(135deg, #ffd700, #ffed4a, #b8860b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Card hover effect */
+.card-hover {
+    transition: all 0.3s ease;
+}
+.card-hover:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 40px rgba(255, 215, 0, 0.2);
+}
+
+/* Button glow */
+.btn-glow {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+.btn-glow:hover {
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+}
+
+/* Sidebar active */
+.nav-active {
+    background: linear-gradient(90deg, rgba(255, 215, 0, 0.2), transparent);
+    border-left: 3px solid #ffd700;
+}
+
+/* Video preview */
+#preview {
+    max-width: 100%;
+    border-radius: 12px;
+    border: 2px solid #333;
+}
+
+/* Grid cards */
+.grid-card {
+    aspect-ratio: 3/4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-weight: bold;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+.grid-card:hover {
+    transform: scale(1.05);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #1a1a2e;
+}
+::-webkit-scrollbar-thumb {
+    background: #ffd700;
+    border-radius: 4px;
+}
+
+/* Animation */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animate-fadeIn {
+    animation: fadeIn 0.5s ease forwards;
+}
+
+@keyframes pulse-gold {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4); }
+    50% { box-shadow: 0 0 20px 10px rgba(255, 215, 0, 0); }
+}
+.pulse-gold {
+    animation: pulse-gold 2s infinite;
+}
